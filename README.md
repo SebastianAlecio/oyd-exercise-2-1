@@ -17,9 +17,6 @@ Containerizar una pequeña aplicación Express en Node.js que lee tres variables
 6. Se hizo `kubectl port-forward svc/webapp-svc 8080:8080 -n webapp` y se verificó la respuesta HTTP.
 7. Se capturó el screenshot del navegador en `http://localhost:8080` y se guardó como `evidence/k8s-run.png`.
 
-## Evidence
-
-![K8s run](evidence/k8s-run.png)
 
 ## Validate and apply
 
@@ -95,79 +92,9 @@ $ curl -s http://localhost:8080
     <p><b>APP_NAME:</b> session-demo</p>
     <p><b>LOG_LEVEL:</b> info</p>
 ```
+## Evidence
 
-## Verificación de Acceptance Criteria
-
-### 1. `kubectl apply -f k8s/ --dry-run=client` sale sin errores
-
-Ver bloque "Validación con `--dry-run=client`" más arriba. Las cuatro líneas terminan en `(dry run)` sin ningún error.
-
-### 2. Deployment con 2 réplicas, imagen `session-demo:1.0` y `imagePullPolicy: Never`
-
-```bash
-$ kubectl get deployment webapp -n webapp -o jsonpath='\
-Replicas: {.spec.replicas}{"\n"}\
-Image: {.spec.template.spec.containers[0].image}{"\n"}\
-imagePullPolicy: {.spec.template.spec.containers[0].imagePullPolicy}{"\n"}'
-Replicas: 2
-Image: session-demo:1.0
-imagePullPolicy: Never
-```
-
-### 3. Las tres variables vienen del ConfigMap vía `envFrom`
-
-```bash
-$ kubectl get configmap webapp-config -n webapp -o yaml | grep -A 4 "^data:"
-data:
-  APP_ENV: development
-  APP_NAME: session-demo
-  LOG_LEVEL: info
-
-$ kubectl get deployment webapp -n webapp -o jsonpath='envFrom: {.spec.template.spec.containers[0].envFrom[0].configMapRef.name}{"\n"}'
-envFrom: webapp-config
-```
-
-El render de la página (ver screenshot en `## Evidence`) confirma que las tres variables llegan al contenedor con los valores esperados.
-
-### 4. Resource requests y limits definidos
-
-```bash
-$ kubectl get deployment webapp -n webapp -o jsonpath='\
-Requests: {.spec.template.spec.containers[0].resources.requests}{"\n"}\
-Limits: {.spec.template.spec.containers[0].resources.limits}{"\n"}'
-Requests: {"cpu":"64m","memory":"128Mi"}
-Limits: {"cpu":"250m","memory":"256Mi"}
-```
-
-### 5. Service selector matchea labels del pod; puerto 8080 → puerto del contenedor 3000
-
-```bash
-$ kubectl get svc webapp-svc -n webapp -o jsonpath='\
-Selector: {.spec.selector}{"\n"}\
-Port: {.spec.ports[0].port}{"\n"}\
-TargetPort: {.spec.ports[0].targetPort}{"\n"}\
-Type: {.spec.type}{"\n"}'
-Selector: {"app":"webapp"}
-Port: 8080
-TargetPort: 3000
-Type: ClusterIP
-
-$ kubectl get pods -n webapp -l app=webapp --show-labels
-NAME                      READY   STATUS    RESTARTS   AGE   LABELS
-webapp-84bbfc7586-qjrwn   1/1     Running   0          11m   app=webapp,pod-template-hash=84bbfc7586
-webapp-84bbfc7586-xrtbg   1/1     Running   0          11m   app=webapp,pod-template-hash=84bbfc7586
-```
-
-El selector `app: webapp` del Service coincide con la label `app=webapp` que tienen ambos pods, y el `port 8080` del Service redirige al `targetPort 3000` del contenedor.
-
-### 6. Ningún manifest apunta al namespace `default`
-
-```bash
-$ grep -rn "namespace:" k8s/
-k8s/deployment.yaml:5:  namespace: webapp
-k8s/service.yaml:5:  namespace: webapp
-k8s/configmap.yaml:5:  namespace: webapp
-```
+![K8s run](evidence/k8s-run.png)
 
 
 ## Estructura del repositorio
